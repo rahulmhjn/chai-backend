@@ -10,6 +10,23 @@ import {uploadOnCloudinary} from "../utils/cloudinary.js"
 const getAllVideos = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
     //TODO: get all videos based on query, sort, pagination
+
+    const sortTypeValue = sortType === 'desc' ? -1 : 1;
+
+    const match = {};
+
+    if(userId) {
+        match.owner = userId;
+    }
+
+    const videos = await Video.find(match)
+        .sort({ [sortBy]: sortTypeValue })
+        .limit(parseInt(limit))
+        .skip((page - 1) * limit);
+
+    res.status(200).json(
+        new ApiResponse(200, videos)
+    )
 })
 
 const publishAVideo = asyncHandler(async (req, res) => {
@@ -26,25 +43,25 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ApiError("Title and description is required");
     }
 
-    const tempVideoFilePath = req.files?.videoFile[0].path;
+    const tempVideoFilePath = req.files?.videoFile[0]?.path;
     if(!tempVideoFilePath) {
-        throw new ApiError("Video File is required");
+        throw new ApiError(400, "Video File is required");
     }
 
-    const tempThumbnailPath = req.files?.thumbnail[0].path;
+    const tempThumbnailPath = req.files?.thumbnail[0]?.path;
     if(!tempThumbnailPath) {
-        throw new ApiError("Video Thumbnail is required");
+        throw new ApiError(400, "Video Thumbnail is required");
     }
 
     const videoFile = await uploadOnCloudinary(tempVideoFilePath);
     const videoThumbnail = await uploadOnCloudinary(tempThumbnailPath);
 
     if(!videoFile) {
-        throw new ApiError("Video File not uploaded successfully")
+        throw new ApiError(400, "Video File not uploaded successfully")
     }
 
     if(!videoThumbnail) {
-        throw new ApiError("Video Thumbnail not uploaded successfully")
+        throw new ApiError(400, "Video Thumbnail not uploaded successfully")
     }
 
     const videoObj = {
