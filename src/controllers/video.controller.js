@@ -76,24 +76,86 @@ const publishAVideo = asyncHandler(async (req, res) => {
     const video = await Video.create(videoObj);
 
     return res.status(201).json(
-        new ApiResponse('201', video, 'Your video is published successfully')
+        new ApiResponse(201, video, 'Your video is published successfully')
     )
 })
 
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: get video by id
+
+    const video = await Video.findById(videoId).populate('owner', '_id email username');
+
+    if (!video) {
+        throw new ApiError(404, 'Video not found');
+    }
+
+    return res.status(200).json(
+        new ApiResponse(200, video)
+    )
+
 })
 
 const updateVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: update video details like title, description, thumbnail
 
+    // check if video is present
+    const video = await Video.findById(videoId);
+
+    if(!video) {
+        throw new ApiError(404, 'Video not found');
+    }
+
+    // only owner can update his video
+    if(video.owner !== req.user._id) {
+        throw new ApiError(401, 'Access denied. You cant update other users video')
+    }
+
+    // check for thumbnail
+    if(req.file.path) {
+        const thumbnail = await uploadOnCloudinary(req.file.path);
+
+        if(!thumbnail.url) {
+            throw new ApiError(500, "Something went wrong while uploading new thumbnail")
+        }
+
+        req.body = { ...req.body, thumbnail: thumbnail.url }
+    }
+
+    const updatedvideo = await Video.findByIdAndUpdate(videoId, {
+        $set: req.body
+    }, {
+        new: true
+    });
+
+    res.status(201).json(
+        new ApiResponse(201, updatedvideo, 'Video updated successfully')
+    )
+
 })
 
 const deleteVideo = asyncHandler(async (req, res) => {
     const { videoId } = req.params
     //TODO: delete video
+
+    // check if video is available
+    const video = await Video.findById(videoId);
+
+    if(!video) {
+        throw new ApiError(404, 'Video not found');
+    }
+
+    // only owner can delete his video
+    if(video.owner !== req.user._id) {
+        throw new ApiError(401, 'Access denied. You cant delete other users video')
+    }
+    
+    await Video.findByIdAndDelete(videoId);
+
+    res.status(200).json(
+        new ApiResponse(200, 'Video deleted successfully')
+    )
 })
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
